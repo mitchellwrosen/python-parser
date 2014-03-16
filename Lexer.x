@@ -15,37 +15,51 @@ import           Data.Word           (Word8)
 import           Text.Printf         (printf)
 }
 
-$ident_first = [a-zA-Z_]    -- first character of an identifier
-$ident_char  = [a-zA-Z0-9_] -- any character of an identifier
+$any                = [. \n]                     -- any character
+$eol                = [\n \r]                    -- any eol character
 
--- http://docs.python.org/2/reference/lexical_analysis.html#identifiers
-@ident = $ident_first $ident_char*
+----------------------------------------------------------------------------------------------
+-- Comments
+----------------------------------------------------------------------------------------------
+@comment            = \# ~$eol*                  -- # until end of line
 
--- http://docs.python.org/2/reference/lexical_analysis.html#string-literals
-@escape_seq = \\ [. \n]
+----------------------------------------------------------------------------------------------
+-- Identifiers (http://docs.python.org/2/reference/lexical_analysis.html#identifiers)
+----------------------------------------------------------------------------------------------
+$ident_char         = [a-zA-Z0-9_]               -- any character of an identifier
+$ident_first        = [a-zA-Z_]                  -- first character of an identifier
+@ident              = $ident_first $ident_char*
 
-$short_string_char  = [^ \n \r \\] -- <any source character except "\" or newline or the quote>
+----------------------------------------------------------------------------------------------
+-- String literals (http://docs.python.org/2/reference/lexical_analysis.html#string-literals)
+----------------------------------------------------------------------------------------------
+@escape_seq         = \\ $any -- TODO: should \CRLF be an escape seq?
 
+$short_string_char  = $any # [\\ \n \r]          -- <any source character except "\" or newline or the quote>
 @short_string_char1 = $short_string_char # '
 @short_string_char2 = $short_string_char # \"
-
 @short_string_item1 = @short_string_char1 | @escape_seq
 @short_string_item2 = @short_string_char2 | @escape_seq
+@short_string       = '  @short_string_item1* '
+                    | \" @short_string_item2* \"
 
-@short_string = ' @short_string_item1* ' | \" @short_string_item2* \"
+$long_string_char   = $any # \\  -- <any source character except "\">
+@long_string_item   = $long_string_char | @escape_seq
+@long_string        = '''    @long_string_item* '''
+                    | \"\"\" @long_string_item* \"\"\"
 
-@string_prefix     = r | u | ur | R  | U  | UR | Ur | uR | b | B | br | Br | bR | BR
-@string_literal    = @string_prefix? @short_string -- | @long_string)
+@string_prefix      = r | u | ur | R  | U  | UR | Ur | uR | b | B | br | Br | bR | BR
+@string_literal     = @string_prefix? (@short_string | @long_string)
 
--- TODO: long strings
--- @long_string       = ''' @long_string_item* '''
---                    | \"\"\" @long_string_item* \"\"\"
--- @long_string_item  = @long_string_char | @escape_seq
+----------------------------------------------------------------------------------------------
+-- Tokens
+----------------------------------------------------------------------------------------------
 
+python :-
 
+   -- Each right-hand side has type :: AlexAction Lexeme
 
-tokens :-
-
+   @comment                      { skip }
    $white+                       { mkL LWhite   }
    -- "--".*                        { mkL LComment }
    -- $digit+                       { mkL LInt     }
@@ -55,7 +69,6 @@ tokens :-
    @string_literal               { mkL LStringLiteral  }
 
 {
--- Each right-hand side has type :: AlexAction Lexeme
 
 keywordOrIdentifier :: AlexAction Lexeme
 keywordOrIdentifier input@(AlexInput _ _ _ str) len = mkL cls input len
@@ -255,8 +268,8 @@ initialAlexState input = AlexState
 newtype Alex a = Alex { unAlex :: StateT AlexState (Either String) a }
                deriving (Functor, Applicative, Monad, MonadState AlexState)
 
-runAlex :: String -> Alex a -> Either String a
-runAlex input (Alex s) = evalStateT s (initialAlexState input)
+runAlex :: Alex a -> String -> Either String a
+runAlex (Alex s) = evalStateT s . initialAlexState
 
 alexError :: String -> Alex a
 alexError = Alex . StateT . const . Left
