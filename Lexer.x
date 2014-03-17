@@ -1,9 +1,10 @@
 {
-{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Lexer (Alex, runAlex, lexToken) where
 
 import           Control.Applicative ((<$>))
+import           Control.Lens
 import           Data.Map            (Map)
 import qualified Data.Map            as M
 import           Text.Printf         (printf)
@@ -12,23 +13,26 @@ import Alex
 }
 
 $any                = [. \n]                     -- any character
-$eol                = [\n \r]                    -- any eol character
+$eol_char           = [\n \r]                    -- LF or CR
+@eol_pattern        = \n | \r | \r \n            -- LF, CR, or CRLF
+@line_join          = \\ @eol_pattern            -- a physical line that ends with a backslash
+$white_no_nl        = $white # $eol_char         -- whitespace that is not a newline
 
 ----------------------------------------------------------------------------------------------
 -- Comments
-----------------------------------------------------------------------------------------------
-@comment            = \# ~$eol*                  -- # until end of line
+
+@comment            = \# ~$eol_char*              -- # until end of line
 
 ----------------------------------------------------------------------------------------------
 -- Identifiers (http://docs.python.org/2/reference/lexical_analysis.html#identifiers)
-----------------------------------------------------------------------------------------------
+
 $ident_char         = [a-zA-Z0-9_]               -- any character of an identifier
 $ident_first        = [a-zA-Z_]                  -- first character of an identifier
 @ident              = $ident_first $ident_char*
 
 ----------------------------------------------------------------------------------------------
 -- String literals (http://docs.python.org/2/reference/lexical_analysis.html#string-literals)
-----------------------------------------------------------------------------------------------
+
 @escape_seq         = \\ $any -- TODO: should \CRLF be an escape seq?
 
 $short_string_char  = $any # [\\ \n \r]          -- <any source character except "\" or newline or the quote>
@@ -49,19 +53,24 @@ $long_string_char   = $any # \\  -- <any source character except "\">
 
 ----------------------------------------------------------------------------------------------
 -- Tokens
-----------------------------------------------------------------------------------------------
 
 python :-
 
    -- Each right-hand side has type :: AlexAction Lexeme
 
+   <0,bol> {
+
+      $white_no_nl+    { skip                }  -- whitespace is ignored
+      @comment         { skip                }  -- comments are not tokens
+      @line_join       { skip                }  -- line joins are ignored
+
+   }
+
    -- Normal lexing state
    <0> {
 
-      @comment         { skip }
-      $white+          { skip }
-
-      @ident           { keywordOrIdentifier }
+      @eol_pattern     { eol                 }
+      @ident           { keywordOrIdentifier }  -- ident could be a keyword
       @string_literal  { mkL LStringLiteral  }
 
    }
@@ -69,7 +78,7 @@ python :-
    -- At the beginning of a line
    <bol> {
 
-      ()               { indentation }
+      ()               { indentation True    }
 
    }
 
@@ -83,13 +92,26 @@ type AlexAction a = AlexInput -> Int -> Alex a
 mkL :: LexemeClass -> AlexAction Lexeme
 mkL c (AlexInput p _ _ str) len = return (Lexeme p c (take len str))
 
+-- Emit a token on consuming a newline. If implicitly joining lines, then
+-- simply emit the next token. Otherwise, emit a NEWLINE and enter <bol>
+-- state.
+eol :: AlexAction Lexeme
+eol input len = do
+    joining <- isImplicitlyJoining
+    if joining
+        then alexMonadScan
+        else emitNewlineToken `withCode` bol
+  where
+    emitNewlineToken :: Alex Lexeme
+    emitNewlineToken = mkL LNewline input len
+
 keywordOrIdentifier :: AlexAction Lexeme
 keywordOrIdentifier input@(AlexInput _ _ _ str) len = mkL cls input len
   where
     cls :: LexemeClass
     cls = maybe LIdent id $ M.lookup (take len str) keywords
 
--- http://docs.python.org/2/reference/lexical_analysis.html#keywords
+-- See http://docs.python.org/2/reference/lexical_analysis.html#keywords
 keywords :: Map String LexemeClass
 keywords = M.fromList
     [ ("and"    , LAnd    ), ("as"      , LAs      ), ("assert", LAssert), ("break" , LBreak )
@@ -102,10 +124,43 @@ keywords = M.fromList
     , ("while"  , LWhile  ), ("with"    , LWith    ), ("yield" , LYield )
     ]
 
-indentation :: AlexAction Lexeme
-indentation (AlexInput (AlexPosn _ _ col) _ _ _) len = do
-    prevCol <- alexGetIndentation
-    undefined
+-- At BOL (or BOF) - apply indentation rules to possibly emit INDENT or DEDENT
+-- tokens.
+--
+-- See http://docs.python.org/2/reference/lexical_analysis.html#indentation
+indentation :: Bool               -- True for BOL, False for BOF
+            -> AlexAction Lexeme
+indentation isBOL input len = alexGetIndentation >>= maybe (alexError "Inconsistent dedent") indentation'
+  where
+    indentation' :: Column -> Alex Lexeme
+    indentation' prevCol = do
+      let curCol = input ^. alexInputPosn . alexPosnCol
+      case compare curCol prevCol of
+          -- Same indentation: do nothing. Return to <0> state and lex.
+          EQ -> alexMonadScan `withCode` 0
+
+          -- More indentation: push the column on the indentation stack, and
+          -- generate one INDENT token. Return to <0> state.
+          GT -> do
+              alexPushIndentation curCol
+              emitIndentToken `withCode` 0
+
+          -- Less indentation: it must be one of the numbers occurring on the
+          -- stack; all numbers on the stack that are larger are popped off, and
+          -- for each number popped off a DEDENT token is generated.
+          --
+          -- Leave the lexer in <bol> state so that it can generate as many
+          -- DEDENT tokens as are necessary.
+          LT -> do
+              _ <- alexPopIndentation
+              emitDedentToken
+
+    emitIndentToken, emitDedentToken :: Alex Lexeme
+    emitIndentToken = emitToken LIndent
+    emitDedentToken = emitToken LDedent
+
+    emitToken :: LexemeClass -> Alex Lexeme
+    emitToken cls = mkL cls input len
 
 -- Action to lex an entire file into a stream of tokens
 lexToken :: Alex [Lexeme]
@@ -119,13 +174,9 @@ lexToken = do
 skip :: AlexAction Lexeme
 skip _ _ = alexMonadScan
 
--- Ignore this token, but set the start code to a new value
-begin :: StartCode -> AlexAction Lexeme
-begin code _ _ = alexPushStartCode code >> alexMonadScan
-
--- Perform an action for this token, and set the start code to a new value
-andBegin :: AlexAction result -> StartCode -> AlexAction result
-andBegin action code input len = alexPushStartCode code >> action input len
+-- Set a new start code and perform an action.
+withCode :: Alex a -> StartCode -> Alex a
+withCode action code = alexSetStartCode code >> action
 
 token :: (AlexInput -> Int -> a) -> AlexAction a
 token t input len = return (t input len)
