@@ -21,18 +21,17 @@ mainOneoff :: String -> IO ()
 mainOneoff = print . runAlex lexToken
 
 mainInteractive :: IO ()
-mainInteractive = loop $ getLineGuard "exit" >>= lift . print . runAlex lexToken
+mainInteractive = while (getLine != "exit") $ print . runAlex lexToken
 
--- Get string input, but fail if it matches the passed string.
-getLineGuard :: String -> MaybeT IO String
-getLineGuard sentinel = do
-    line <- lift getLine
+(!=) :: (Monad m, Eq a) => m a -> a -> MaybeT m a
+action != sentinel = do
+    line <- lift action
     when (line == sentinel)
-        exit
+        mzero
     return line
 
-exit :: MonadPlus m => m a
-exit = mzero
-
-loop :: MaybeT IO a -> IO ()
-loop = void . runMaybeT . forever
+-- Run a possibly failing action, use its result to run a second action.
+-- Think of the first action as the loop "condition", and the second action
+-- as the loop "body" that uses the result of the condition.
+while :: (Functor m, Monad m) => MaybeT m a -> (a -> m b) -> m ()
+while act1 act2 = void . runMaybeT . forever $ act1 >>= lift . act2
