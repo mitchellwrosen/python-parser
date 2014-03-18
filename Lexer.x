@@ -31,14 +31,14 @@ $white_no_nl        = $white # $eol_char         -- whitespace that is not a new
 $lowercase          = [a-z]
 $uppercase          = [A-Z]
 $letter             = [$lowercase $uppercase]
-$ident_first        = [$letter _]  -- first character of an identifier
+$ident_first        = [$letter _]                -- first character of an identifier
 $ident_char         = [$ident_first $digit]      -- any character of an identifier
 @ident              = $ident_first $ident_char*
 
 -- -----------------------------------------------------------------------------
 -- String literals (http://docs.python.org/2/reference/lexical_analysis.html#string-literals)
 
-@escape_seq         = \\ $any -- TODO: should \CRLF be an escape seq?
+@escape_seq         = \\ $any                    -- TODO: should \CRLF be an escape seq?
 
 $short_string_char  = $any # [\\ \n \r]          -- <any source character except "\" or newline or the quote>
 @short_string_char1 = $short_string_char # '
@@ -148,13 +148,12 @@ keywords = M.fromList
     , ("while"  , LWhile  ), ("with"    , LWith    ), ("yield" , LYield )
     ]
 
--- At BOL (or BOF) - apply indentation rules to possibly emit INDENT or DEDENT
--- tokens.
+-- At beginning-of-line, not inside implicitly joined lines. Apply indentation
+-- rules to possibly emit INDENT or DEDENT tokens.
 --
 -- See http://docs.python.org/2/reference/lexical_analysis.html#indentation
-indentation :: Bool               -- True for BOL, False for BOF
-            -> AlexAction Lexeme
-indentation isBOL input len = alexGetIndentation >>= maybe (alexError "Inconsistent dedent") indentation'
+indentation :: AlexAction Lexeme
+indentation input len = alexGetIndentation >>= maybe (alexError "Inconsistent dedent") indentation'
   where
     indentation' :: Column -> Alex Lexeme
     indentation' prevCol = do
