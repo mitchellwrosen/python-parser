@@ -72,6 +72,14 @@ $bin_digit          = [01]
 @long_integer       = @integer (l|L)
 
 -- -----------------------------------------------------------------------------
+-- Float literals (http://docs.python.org/2/reference/lexical_analysis.html#floating-point-literals)
+
+@exponent           = (e|E) (\+|\-)? $digit+
+@point_float        = $digit* \. $digit+ | $digit+ \.
+@exponent_float     = ($digit+ | @point_float) @exponent
+@float              = @point_float | @exponent_float
+
+-- -----------------------------------------------------------------------------
 -- Tokens
 
 python :-
@@ -95,6 +103,7 @@ python :-
       @string_literal  { mkL LStringLiteral  }
       @long_integer    { mkL LLongInteger    }
       @integer         { mkL LInteger        }
+      @float           { mkL LFloat          }
 
    }
 
@@ -102,7 +111,7 @@ python :-
    <bol> {
 
       @eol_pattern     { skip                }  -- don't emit newline
-      ()               { indentation True    }
+      ()               { indentation         }
 
    }
 

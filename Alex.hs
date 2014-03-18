@@ -74,14 +74,14 @@ data LexemeClass
     -- Identifiers
     | LIdent
     -- Keywords
-    | LAnd    | LAs   | LAssert  | LBreak | LClass | LContinue | LDef    | LDelete | LElif  | LElse
-    | LExcept | LExec | LFinally | LFor   | LFrom  | LGlobal   | LIf     | LImport | LIn    | LIs
-    | LLambda | LNot  | LOr      | LPass  | LPrint | LRaise    | LReturn | LTry    | LWhile | LWith
-    | LYield
+    | LAnd   | LAs     | LAssert | LBreak | LClass   | LContinue | LDef   | LDelete
+    | LElif  | LElse   | LExcept | LExec  | LFinally | LFor      | LFrom  | LGlobal
+    | LIf    | LImport | LIn     | LIs    | LLambda  | LNot      | LOr    | LPass
+    | LPrint | LRaise  | LReturn | LTry   | LWhile   | LWith     | LYield
     -- String Literals
     | LStringLiteral
     -- Numeric Literals
-    | LInteger | LLongInteger
+    | LInteger | LLongInteger | LFloat
     -- EOF
     | LEOF
     deriving (Eq, Show)
@@ -93,6 +93,7 @@ data Lexeme = Lexeme
     } deriving (Eq, Show)
 makeLenses ''Lexeme
 
+-- Short-hand show instance for quick visual inspection.
 lexemeShow :: Lexeme -> String
 lexemeShow (Lexeme _ LNewline _)         = "<\\n>"
 lexemeShow (Lexeme _ LIndent _)          = "<indent>"
@@ -132,6 +133,7 @@ lexemeShow (Lexeme _ LYield _)           = "<yield>"
 lexemeShow (Lexeme _ LStringLiteral str) = "<str '" ++ str ++ "'>"
 lexemeShow (Lexeme _ LInteger str)       = "<int '" ++ str ++ "'>"
 lexemeShow (Lexeme _ LLongInteger str)   = "<long '" ++ str ++ "'>"
+lexemeShow (Lexeme _ LFloat str)         = "<float '" ++ str ++ "'>"
 lexemeShow (Lexeme _ LEOF _)             = "<EOF>"
 
 -- -----------------------------------------------------------------------------
