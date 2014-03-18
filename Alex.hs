@@ -91,6 +91,45 @@ data Lexeme = Lexeme
     } deriving (Eq, Show)
 makeLenses ''Lexeme
 
+lexemeShow :: Lexeme -> String
+lexemeShow (Lexeme _ LNewline _)         = "<\\n>"
+lexemeShow (Lexeme _ LIndent _)          = "<indent>"
+lexemeShow (Lexeme _ LDedent _)          = "<dedent>"
+lexemeShow (Lexeme _ LIdent str)         = "<var '" ++ str ++ "'>"
+lexemeShow (Lexeme _ LAnd _)             = "<and>"
+lexemeShow (Lexeme _ LAs _)              = "<as>"
+lexemeShow (Lexeme _ LAssert _)          = "<assert>"
+lexemeShow (Lexeme _ LBreak _)           = "<break>"
+lexemeShow (Lexeme _ LClass _)           = "<class>"
+lexemeShow (Lexeme _ LContinue _)        = "<continue>"
+lexemeShow (Lexeme _ LDef _)             = "<def>"
+lexemeShow (Lexeme _ LDelete _)          = "<delete>"
+lexemeShow (Lexeme _ LElif _)            = "<elif>"
+lexemeShow (Lexeme _ LElse _)            = "<else>"
+lexemeShow (Lexeme _ LExcept _)          = "<except>"
+lexemeShow (Lexeme _ LExec _)            = "<exec>"
+lexemeShow (Lexeme _ LFinally _)         = "<finally>"
+lexemeShow (Lexeme _ LFor _)             = "<for>"
+lexemeShow (Lexeme _ LFrom _)            = "<from>"
+lexemeShow (Lexeme _ LGlobal _)          = "<global>"
+lexemeShow (Lexeme _ LIf _)              = "<if>"
+lexemeShow (Lexeme _ LImport _)          = "<import>"
+lexemeShow (Lexeme _ LIn _)              = "<in>"
+lexemeShow (Lexeme _ LIs _)              = "<is>"
+lexemeShow (Lexeme _ LLambda _)          = "<lambda>"
+lexemeShow (Lexeme _ LNot _)             = "<not>"
+lexemeShow (Lexeme _ LOr _)              = "<or>"
+lexemeShow (Lexeme _ LPass _)            = "<pass>"
+lexemeShow (Lexeme _ LPrint _)           = "<print>"
+lexemeShow (Lexeme _ LRaise _)           = "<raise>"
+lexemeShow (Lexeme _ LReturn _)          = "<return>"
+lexemeShow (Lexeme _ LTry _)             = "<try>"
+lexemeShow (Lexeme _ LWhile _)           = "<while>"
+lexemeShow (Lexeme _ LWith _)            = "<with>"
+lexemeShow (Lexeme _ LYield _)           = "<yield>"
+lexemeShow (Lexeme _ LStringLiteral str) = "<str '" ++ str ++ "'>"
+lexemeShow (Lexeme _ LEOF _)             = "<EOF>"
+
 -- -----------------------------------------------------------------------------
 -- The Alex monad
 
@@ -110,8 +149,8 @@ makeLenses ''AlexState
 initialAlexState :: String -> AlexState
 initialAlexState input = AlexState
     { _alexStateInput          = initAlexInput input
-    , _alexStateStartCode      = 0
-    , _alexStateIndentStack    = [0]
+    , _alexStateStartCode      = 1 -- bol, but can't call it so (circluar import)
+    , _alexStateIndentStack    = [1] -- spec says 0, but this is a 1-based column
     , _alexStateParens         = 0
     , _alexStateBrackets       = 0
     , _alexStateBraces         = 0

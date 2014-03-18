@@ -69,15 +69,16 @@ python :-
    -- Normal lexing state
    <0> {
 
-      @eol_pattern     { eol                 }
       @ident           { keywordOrIdentifier }  -- ident could be a keyword
       @string_literal  { mkL LStringLiteral  }
+      @eol_pattern     { eol                 }
 
    }
 
    -- At the beginning of a line
    <bol> {
 
+      @eol_pattern     { skip                }  -- don't emit newline
       ()               { indentation True    }
 
    }
@@ -197,7 +198,7 @@ alexMonadScan = do
 
     onError :: AlexInput -> Alex Lexeme
     onError (AlexInput (AlexPosn _ line col) ch _ _) = alexError $
-        printf "lexical error at line %d, column %d: unexpected char %c" line col ch
+        printf "lexical error at line %d, column %d: unexpected char after '%c'" line col ch
 
     onSkip :: AlexInput -> Int -> Alex Lexeme
     onSkip input _ = do

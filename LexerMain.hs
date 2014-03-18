@@ -7,7 +7,8 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Class (lift)
 import System.Environment (getArgs)
 
-import Lexer (lexToken, runAlex)
+import Alex
+import Lexer
 
 main :: IO ()
 main = do
@@ -18,10 +19,13 @@ main = do
         args   -> mainOneoff (unwords args)
 
 mainOneoff :: String -> IO ()
-mainOneoff = print . runAlex lexToken
+mainOneoff = print' . runAlex lexToken
 
 mainInteractive :: IO ()
-mainInteractive = while (getLine != "exit") $ print . runAlex lexToken
+mainInteractive = while (getLine != "exit") $ print' . runAlex lexToken
+
+print' :: Either String [Lexeme] -> IO ()
+print' = either print (putStrLn . concatMap lexemeShow)
 
 (!=) :: (Monad m, Eq a) => m a -> a -> MaybeT m a
 action != sentinel = do
