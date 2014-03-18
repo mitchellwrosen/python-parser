@@ -80,6 +80,11 @@ $bin_digit          = [01]
 @float              = @point_float | @exponent_float
 
 -- -----------------------------------------------------------------------------
+-- Imaginary literals (http://docs.python.org/2/reference/lexical_analysis.html#imaginary-literals)
+
+@imaginary          = (@float | $digit+) (j|J)
+
+-- -----------------------------------------------------------------------------
 -- Tokens
 
 python :-
@@ -88,22 +93,75 @@ python :-
 
    <0,bol> {
 
-      $white_no_nl+    { skip                }  -- whitespace is ignored
-      @comment         { skip                }  -- comments are not tokens
-      @line_join       { skip                }  -- line joins are ignored
+      $white_no_nl+    { skip                     }  -- whitespace is ignored
+      @comment         { skip                     }  -- comments are not tokens
+      @line_join       { skip                     }  -- line joins are ignored
 
    }
 
    -- Normal lexing state
    <0> {
 
-      @eol_pattern     { eol                 }
+      @eol_pattern     { eol                      }
 
-      @ident           { keywordOrIdentifier }  -- ident could be a keyword
-      @string_literal  { mkL LStringLiteral  }
-      @long_integer    { mkL LLongInteger    }
-      @integer         { mkL LInteger        }
-      @float           { mkL LFloat          }
+      -- Identifiers
+      @ident           { keywordOrIdentifier      }  -- ident could be a keyword
+
+      -- Literals
+      @string_literal  { mkL LStringLiteral       }
+      @long_integer    { mkL LLongInteger         }
+      @integer         { mkL LInteger             }
+      @float           { mkL LFloat               }
+      @imaginary       { mkL LImaginary           }
+
+      -- Operators
+      "+"              { mkL LPlus                }
+      "-"              { mkL LMinus               }
+      "*"              { mkL LMult                }
+      "**"             { mkL LPow                 }
+      "/"              { mkL LFloatDiv            }
+      "//"             { mkL LIntDiv              }
+      "%"              { mkL LMod                 }
+      "<<"             { mkL LShiftL              }
+      ">>"             { mkL LShiftR              }
+      "&"              { mkL LBinAnd              }
+      "|"              { mkL LBinOr               }
+      "^"              { mkL LXor                 }
+      "~"              { mkL LComplement          }
+      "<"              { mkL LLT                  }
+      ">"              { mkL LGT                  }
+      "<="             { mkL LLTE                 }
+      ">="             { mkL LGTE                 }
+      "=="             { mkL LEQ                  }
+      "!="             { mkL LNEQ                 }
+      "<>"             { mkL LNEQ2                }
+
+      -- Delimiters
+      "("              { openParen  LOpenParen    }
+      "["              { openParen  LOpenBrace    }
+      "{"              { openParen  LOpenBracket  }
+      ")"              { closeParen LCloseParen   }
+      "]"              { closeParen LCloseBrace   }
+      "}"              { closeParen LCloseBracket }
+      "@"              { mkL LAt                  }
+      ","              { mkL LComma               }
+      ":"              { mkL LColon               }
+      "."              { mkL LDot                 }
+      "`"              { mkL LBacktick            }
+      "="              { mkL LEquals              }
+      ";"              { mkL LSemicolon           }
+      "+="             { mkL LPlusEq              }
+      "-="             { mkL LMinusEq             }
+      "*="             { mkL LMultEq              }
+      "/="             { mkL LFloatDivEq          }
+      "//="            { mkL LIntDivEq            }
+      "%="             { mkL LModEq               }
+      "&="             { mkL LBinAndEq            }
+      "|="             { mkL LBinOrEq             }
+      "^="             { mkL LXorEq               }
+      ">>="            { mkL LShiftREq            }
+      "<<="            { mkL LShiftLEq            }
+      "**="            { mkL LPowEq               }
 
    }
 
@@ -193,6 +251,16 @@ indentation input len = alexGetIndentation >>= maybe (alexError "Inconsistent de
 
     emitToken :: LexemeClass -> Alex Lexeme
     emitToken cls = mkL cls input len
+
+openParen :: LexemeClass -> AlexAction Lexeme
+openParen cls input len = do
+    alexOpenParen
+    mkL cls input len
+
+closeParen :: LexemeClass -> AlexAction Lexeme
+closeParen cls input len = do
+    alexCloseParen
+    mkL cls input len
 
 -- Action to lex an entire file into a stream of tokens
 lexToken :: Alex [Lexeme]

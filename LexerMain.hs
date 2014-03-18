@@ -25,7 +25,7 @@ mainInteractive :: IO ()
 mainInteractive = while (getLine != "exit") $ print' . runAlex lexToken
 
 print' :: Either String [Lexeme] -> IO ()
-print' = either print (putStrLn . concatMap lexemeShow)
+print' = either print (putStrLn . unwords . map lexemeShow)
 
 (!=) :: (Monad m, Eq a) => m a -> a -> MaybeT m a
 action != sentinel = do
