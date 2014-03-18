@@ -80,6 +80,8 @@ data LexemeClass
     | LYield
     -- String Literals
     | LStringLiteral
+    -- Numeric Literals
+    | LInteger | LLongInteger
     -- EOF
     | LEOF
     deriving (Eq, Show)
@@ -128,6 +130,8 @@ lexemeShow (Lexeme _ LWhile _)           = "<while>"
 lexemeShow (Lexeme _ LWith _)            = "<with>"
 lexemeShow (Lexeme _ LYield _)           = "<yield>"
 lexemeShow (Lexeme _ LStringLiteral str) = "<str '" ++ str ++ "'>"
+lexemeShow (Lexeme _ LInteger str)       = "<int '" ++ str ++ "'>"
+lexemeShow (Lexeme _ LLongInteger str)   = "<long '" ++ str ++ "'>"
 lexemeShow (Lexeme _ LEOF _)             = "<EOF>"
 
 -- -----------------------------------------------------------------------------

@@ -13,24 +13,29 @@ import Alex
 }
 
 $any                = [. \n]                     -- any character
+$digit              = [0-9]
+
 $eol_char           = [\n \r]                    -- LF or CR
 @eol_pattern        = \n | \r | \r \n            -- LF, CR, or CRLF
 @line_join          = \\ @eol_pattern            -- a physical line that ends with a backslash
 $white_no_nl        = $white # $eol_char         -- whitespace that is not a newline
 
-----------------------------------------------------------------------------------------------
--- Comments
+-- -----------------------------------------------------------------------------
+-- Comments (http://docs.python.org/2/reference/lexical_analysis.html#comments)
 
 @comment            = \# ~$eol_char*              -- # until end of line
 
-----------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Identifiers (http://docs.python.org/2/reference/lexical_analysis.html#identifiers)
 
-$ident_char         = [a-zA-Z0-9_]               -- any character of an identifier
-$ident_first        = [a-zA-Z_]                  -- first character of an identifier
+$lowercase          = [a-z]
+$uppercase          = [A-Z]
+$letter             = [$lowercase $uppercase]
+$ident_first        = [$letter _]  -- first character of an identifier
+$ident_char         = [$ident_first $digit]      -- any character of an identifier
 @ident              = $ident_first $ident_char*
 
-----------------------------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
 -- String literals (http://docs.python.org/2/reference/lexical_analysis.html#string-literals)
 
 @escape_seq         = \\ $any -- TODO: should \CRLF be an escape seq?
@@ -51,7 +56,22 @@ $long_string_char   = $any # \\  -- <any source character except "\">
 @string_prefix      = r | u | ur | R  | U  | UR | Ur | uR | b | B | br | Br | bR | BR
 @string_literal     = @string_prefix? (@short_string | @long_string)
 
-----------------------------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- Integer literals (http://docs.python.org/2/reference/lexical_analysis.html#integer-and-long-integer-literals)
+
+$non_zero_digit     = [1-9]
+$oct_digit          = [0-7]
+$hex_digit          = [0-9a-fA-F]
+$bin_digit          = [01]
+
+@bin_integer        = 0 (b|B) $bin_digit+
+@hex_integer        = 0 (x|X) $hex_digit+
+@oct_integer        = 0 (o|O)? $oct_digit+
+@dec_integer        = $non_zero_digit $digit* | 0
+@integer            = @dec_integer | @oct_integer | @hex_integer | @bin_integer
+@long_integer       = @integer (l|L)
+
+-- -----------------------------------------------------------------------------
 -- Tokens
 
 python :-
@@ -69,9 +89,12 @@ python :-
    -- Normal lexing state
    <0> {
 
+      @eol_pattern     { eol                 }
+
       @ident           { keywordOrIdentifier }  -- ident could be a keyword
       @string_literal  { mkL LStringLiteral  }
-      @eol_pattern     { eol                 }
+      @long_integer    { mkL LLongInteger    }
+      @integer         { mkL LInteger        }
 
    }
 
