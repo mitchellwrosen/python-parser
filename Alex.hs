@@ -66,131 +66,183 @@ alexGetByte (AlexInput p _ []     (c:s)) = p' `seq`  Just (b, AlexInput p'  c  b
     (b:bs) = utf8Encode c
 
 -- -----------------------------------------------------------------------------
--- The Lexeme type
+-- The Token type
 
-data LexemeClass
-    -- Newline/Indentation
-    = LNewline | LIndent | LDedent
-    -- Identifiers
-    | LIdent
-    -- Keywords
-    | LAnd   | LAs     | LAssert | LBreak | LClass   | LContinue | LDef   | LDelete
-    | LElif  | LElse   | LExcept | LExec  | LFinally | LFor      | LFrom  | LGlobal
-    | LIf    | LImport | LIn     | LIs    | LLambda  | LNot      | LOr    | LPass
-    | LPrint | LRaise  | LReturn | LTry   | LWhile   | LWith     | LYield
-    -- String Literals
-    | LStringLiteral
-    -- Numeric Literals
-    | LInteger | LLongInteger | LFloat | LImaginary
-    -- Operators
-    | LPlus   | LMinus  | LMult   | LPow   | LFloatDiv | LIntDiv     | LMod
-    | LShiftL | LShiftR | LBinAnd | LBinOr | LXor      | LComplement | LLT
-    | LGT     | LLTE    | LGTE    | LEQ    | LNEQ      | LNEQ2
-      -- Delimiters
-    | LOpenParen    | LOpenBrace  | LOpenBracket | LCloseParen | LCloseBrace
-    | LCloseBracket | LAt         | LComma       | LColon      | LDot
-    | LBacktick     | LEquals     | LSemicolon   | LPlusEq     | LMinusEq
-    | LMultEq       | LFloatDivEq | LIntDivEq    | LModEq      | LBinAndEq
-    | LBinOrEq      | LXorEq      | LShiftREq    | LShiftLEq   | LPowEq
-    -- EOF
-    | LEOF
+data Token
+    = TNewline       AlexPosn
+    | TIndent        AlexPosn
+    | TDedent        AlexPosn
+    | TIdent         AlexPosn String
+    | TAnd           AlexPosn
+    | TAs            AlexPosn
+    | TAssert        AlexPosn
+    | TBreak         AlexPosn
+    | TClass         AlexPosn
+    | TContinue      AlexPosn
+    | TDef           AlexPosn
+    | TDelete        AlexPosn
+    | TElif          AlexPosn
+    | TElse          AlexPosn
+    | TExcept        AlexPosn
+    | TExec          AlexPosn
+    | TFinally       AlexPosn
+    | TFor           AlexPosn
+    | TFrom          AlexPosn
+    | TGlobal        AlexPosn
+    | TIf            AlexPosn
+    | TImport        AlexPosn
+    | TIn            AlexPosn
+    | TIs            AlexPosn
+    | TLambda        AlexPosn
+    | TNot           AlexPosn
+    | TOr            AlexPosn
+    | TPass          AlexPosn
+    | TPrint         AlexPosn
+    | TRaise         AlexPosn
+    | TReturn        AlexPosn
+    | TTry           AlexPosn
+    | TWhile         AlexPosn
+    | TWith          AlexPosn
+    | TYield         AlexPosn
+    | TStringLiteral AlexPosn String
+    | TInteger       AlexPosn Integer
+    | TLongInteger   AlexPosn Integer
+    | TFloat         AlexPosn Double
+    | TImaginary     AlexPosn Double
+    | TPlus          AlexPosn
+    | TMinus         AlexPosn
+    | TMult          AlexPosn
+    | TPow           AlexPosn
+    | TFloatDiv      AlexPosn
+    | TIntDiv        AlexPosn
+    | TMod           AlexPosn
+    | TShiftL        AlexPosn
+    | TShiftR        AlexPosn
+    | TBinAnd        AlexPosn
+    | TBinOr         AlexPosn
+    | TXor           AlexPosn
+    | TComplement    AlexPosn
+    | TLT            AlexPosn
+    | TGT            AlexPosn
+    | TLTE           AlexPosn
+    | TGTE           AlexPosn
+    | TEQ            AlexPosn
+    | TNEQ           AlexPosn
+    | TOpenParen     AlexPosn
+    | TOpenBrace     AlexPosn
+    | TOpenBracket   AlexPosn
+    | TCloseParen    AlexPosn
+    | TCloseBrace    AlexPosn
+    | TCloseBracket  AlexPosn
+    | TAt            AlexPosn
+    | TComma         AlexPosn
+    | TColon         AlexPosn
+    | TDot           AlexPosn
+    | TBacktick      AlexPosn
+    | TEquals        AlexPosn
+    | TSemicolon     AlexPosn
+    | TPlusEq        AlexPosn
+    | TMinusEq       AlexPosn
+    | TMultEq        AlexPosn
+    | TFloatDivEq    AlexPosn
+    | TIntDivEq      AlexPosn
+    | TModEq         AlexPosn
+    | TBinAndEq      AlexPosn
+    | TBinOrEq       AlexPosn
+    | TXorEq         AlexPosn
+    | TShiftREq      AlexPosn
+    | TShiftLEq      AlexPosn
+    | TPowEq         AlexPosn
+    | TEOF
     deriving (Eq, Show)
 
-data Lexeme = Lexeme
-    { _lexemePosn  :: AlexPosn
-    , _lexemeClass :: !LexemeClass
-    , _lexemeStr   :: String
-    } deriving (Eq, Show)
-makeLenses ''Lexeme
-
 -- Short-hand show instance for quick visual inspection.
-lexemeShow :: Lexeme -> String
-lexemeShow (Lexeme _ LNewline _)         = "<\\n>"
-lexemeShow (Lexeme _ LIndent _)          = "<indent>"
-lexemeShow (Lexeme _ LDedent _)          = "<dedent>"
-lexemeShow (Lexeme _ LIdent str)         = "<var '" ++ str ++ "'>"
-lexemeShow (Lexeme _ LAnd _)             = "and"
-lexemeShow (Lexeme _ LAs _)              = "as"
-lexemeShow (Lexeme _ LAssert _)          = "assert"
-lexemeShow (Lexeme _ LBreak _)           = "break"
-lexemeShow (Lexeme _ LClass _)           = "class"
-lexemeShow (Lexeme _ LContinue _)        = "continue"
-lexemeShow (Lexeme _ LDef _)             = "def"
-lexemeShow (Lexeme _ LDelete _)          = "delete"
-lexemeShow (Lexeme _ LElif _)            = "elif"
-lexemeShow (Lexeme _ LElse _)            = "else"
-lexemeShow (Lexeme _ LExcept _)          = "except"
-lexemeShow (Lexeme _ LExec _)            = "exec"
-lexemeShow (Lexeme _ LFinally _)         = "finally"
-lexemeShow (Lexeme _ LFor _)             = "for"
-lexemeShow (Lexeme _ LFrom _)            = "from"
-lexemeShow (Lexeme _ LGlobal _)          = "global"
-lexemeShow (Lexeme _ LIf _)              = "if"
-lexemeShow (Lexeme _ LImport _)          = "import"
-lexemeShow (Lexeme _ LIn _)              = "in"
-lexemeShow (Lexeme _ LIs _)              = "is"
-lexemeShow (Lexeme _ LLambda _)          = "lambda"
-lexemeShow (Lexeme _ LNot _)             = "not"
-lexemeShow (Lexeme _ LOr _)              = "or"
-lexemeShow (Lexeme _ LPass _)            = "pass"
-lexemeShow (Lexeme _ LPrint _)           = "print"
-lexemeShow (Lexeme _ LRaise _)           = "raise"
-lexemeShow (Lexeme _ LReturn _)          = "return"
-lexemeShow (Lexeme _ LTry _)             = "try"
-lexemeShow (Lexeme _ LWhile _)           = "while"
-lexemeShow (Lexeme _ LWith _)            = "with"
-lexemeShow (Lexeme _ LYield _)           = "yield"
-lexemeShow (Lexeme _ LStringLiteral str) = "<str '" ++ str ++ ">'"
-lexemeShow (Lexeme _ LInteger str)       = "<int '" ++ str ++ ">'"
-lexemeShow (Lexeme _ LLongInteger str)   = "<long '" ++ str ++ "'>"
-lexemeShow (Lexeme _ LFloat str)         = "<float '" ++ str ++ "'>"
-lexemeShow (Lexeme _ LImaginary str)     = "<imag '" ++ str ++ "'>"
-lexemeShow (Lexeme _ LPlus _)            = "+"
-lexemeShow (Lexeme _ LMinus _)           = "-"
-lexemeShow (Lexeme _ LMult _)            = "*"
-lexemeShow (Lexeme _ LPow _)             = "**"
-lexemeShow (Lexeme _ LFloatDiv _)        = "/"
-lexemeShow (Lexeme _ LIntDiv _)          = "//"
-lexemeShow (Lexeme _ LMod _)             = "%"
-lexemeShow (Lexeme _ LShiftL _)          = "<<"
-lexemeShow (Lexeme _ LShiftR _)          = ">>"
-lexemeShow (Lexeme _ LBinAnd _)          = "&"
-lexemeShow (Lexeme _ LBinOr _)           = "|"
-lexemeShow (Lexeme _ LXor _)             = "^"
-lexemeShow (Lexeme _ LComplement _)      = "~"
-lexemeShow (Lexeme _ LLT _)              = "<"
-lexemeShow (Lexeme _ LGT _)              = ">"
-lexemeShow (Lexeme _ LLTE _)             = "<="
-lexemeShow (Lexeme _ LGTE _)             = ">="
-lexemeShow (Lexeme _ LEQ _)              = "=="
-lexemeShow (Lexeme _ LNEQ _)             = "!="
-lexemeShow (Lexeme _ LNEQ2 _)            = "<>"
-lexemeShow (Lexeme _ LOpenParen _)       = "("
-lexemeShow (Lexeme _ LOpenBrace _)       = "["
-lexemeShow (Lexeme _ LOpenBracket _)     = "{"
-lexemeShow (Lexeme _ LCloseParen _)      = ")"
-lexemeShow (Lexeme _ LCloseBrace _)      = "]"
-lexemeShow (Lexeme _ LCloseBracket _)    = "}"
-lexemeShow (Lexeme _ LAt _)              = "@"
-lexemeShow (Lexeme _ LComma _)           = ","
-lexemeShow (Lexeme _ LColon _)           = ":"
-lexemeShow (Lexeme _ LDot _)             = "."
-lexemeShow (Lexeme _ LBacktick _)        = "`"
-lexemeShow (Lexeme _ LEquals _)          = "="
-lexemeShow (Lexeme _ LSemicolon _)       = ";"
-lexemeShow (Lexeme _ LPlusEq _)          = "+="
-lexemeShow (Lexeme _ LMinusEq _)         = "-="
-lexemeShow (Lexeme _ LMultEq _)          = "*="
-lexemeShow (Lexeme _ LFloatDivEq _)      = "/="
-lexemeShow (Lexeme _ LIntDivEq _)        = "//="
-lexemeShow (Lexeme _ LModEq _)           = "%="
-lexemeShow (Lexeme _ LBinAndEq _)        = "&="
-lexemeShow (Lexeme _ LBinOrEq _)         = "|="
-lexemeShow (Lexeme _ LXorEq _)           = "^="
-lexemeShow (Lexeme _ LShiftREq _)        = ">>="
-lexemeShow (Lexeme _ LShiftLEq _)        = "<<="
-lexemeShow (Lexeme _ LPowEq _)           = "**="
-lexemeShow (Lexeme _ LEOF _)             = "<EOF>"
+tokenShow :: Token -> String
+tokenShow (TNewline _)           = "<\\n>"
+tokenShow (TIndent _)            = "<indent>"
+tokenShow (TDedent _)            = "<dedent>"
+tokenShow (TIdent _ str)         = "<var '" ++ str ++ "'>"
+tokenShow (TAnd _)               = "and"
+tokenShow (TAs _)                = "as"
+tokenShow (TAssert _)            = "assert"
+tokenShow (TBreak _)             = "break"
+tokenShow (TClass _)             = "class"
+tokenShow (TContinue _)          = "continue"
+tokenShow (TDef _)               = "def"
+tokenShow (TDelete _)            = "delete"
+tokenShow (TElif _)              = "elif"
+tokenShow (TElse _)              = "else"
+tokenShow (TExcept _)            = "except"
+tokenShow (TExec _)              = "exec"
+tokenShow (TFinally _)           = "finally"
+tokenShow (TFor _)               = "for"
+tokenShow (TFrom _)              = "from"
+tokenShow (TGlobal _)            = "global"
+tokenShow (TIf _)                = "if"
+tokenShow (TImport _)            = "import"
+tokenShow (TIn _)                = "in"
+tokenShow (TIs _)                = "is"
+tokenShow (TLambda _)            = "lambda"
+tokenShow (TNot _)               = "not"
+tokenShow (TOr _)                = "or"
+tokenShow (TPass _)              = "pass"
+tokenShow (TPrint _)             = "print"
+tokenShow (TRaise _)             = "raise"
+tokenShow (TReturn _)            = "return"
+tokenShow (TTry _)               = "try"
+tokenShow (TWhile _)             = "while"
+tokenShow (TWith _)              = "with"
+tokenShow (TYield _)             = "yield"
+tokenShow (TStringLiteral _ str) = "<str '" ++ str ++ "'>"
+tokenShow (TInteger _ n)         = "<int '" ++ show n ++ "'>"
+tokenShow (TLongInteger _ n)     = "<long '" ++ show n ++ "'>"
+tokenShow (TFloat _ n)           = "<float '" ++ show n ++ "'>"
+tokenShow (TImaginary _ n)       = "<imag '" ++ show n ++ "'>"
+tokenShow (TPlus _)              = "+"
+tokenShow (TMinus _)             = "-"
+tokenShow (TMult _)              = "*"
+tokenShow (TPow _)               = "**"
+tokenShow (TFloatDiv _)          = "/"
+tokenShow (TIntDiv _)            = "//"
+tokenShow (TMod _)               = "%"
+tokenShow (TShiftL _)            = "<<"
+tokenShow (TShiftR _)            = ">>"
+tokenShow (TBinAnd _)            = "&"
+tokenShow (TBinOr _)             = "|"
+tokenShow (TXor _)               = "^"
+tokenShow (TComplement _)        = "~"
+tokenShow (TLT _)                = "<"
+tokenShow (TGT _)                = ">"
+tokenShow (TLTE _)               = "<="
+tokenShow (TGTE _)               = ">="
+tokenShow (TEQ _)                = "=="
+tokenShow (TNEQ _)               = "!="
+tokenShow (TOpenParen _)         = "("
+tokenShow (TOpenBrace _)         = "["
+tokenShow (TOpenBracket _)       = "{"
+tokenShow (TCloseParen _)        = ")"
+tokenShow (TCloseBrace _)        = "]"
+tokenShow (TCloseBracket _)      = "}"
+tokenShow (TAt _)                = "@"
+tokenShow (TComma _)             = ","
+tokenShow (TColon _)             = ":"
+tokenShow (TDot _)               = "."
+tokenShow (TBacktick _)          = "`"
+tokenShow (TEquals _)            = "="
+tokenShow (TSemicolon _)         = ";"
+tokenShow (TPlusEq _)            = "+="
+tokenShow (TMinusEq _)           = "-="
+tokenShow (TMultEq _)            = "*="
+tokenShow (TFloatDivEq _)        = "/="
+tokenShow (TIntDivEq _)          = "//="
+tokenShow (TModEq _)             = "%="
+tokenShow (TBinAndEq _)          = "&="
+tokenShow (TBinOrEq _)           = "|="
+tokenShow (TXorEq _)             = "^="
+tokenShow (TShiftREq _)          = ">>="
+tokenShow (TShiftLEq _)          = "<<="
+tokenShow (TPowEq _)             = "**="
+tokenShow TEOF                   = "<EOF>"
 
 -- -----------------------------------------------------------------------------
 -- The Alex monad
